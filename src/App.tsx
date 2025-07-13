@@ -24,6 +24,7 @@ import {
   Divider,
   Tooltip
 } from '@mui/material'
+import type { SelectChangeEvent } from '@mui/material'
 import { 
   CloudUpload, 
   Close, 
@@ -146,7 +147,7 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false)
 
   const handleInputChange = (field: keyof EvidenceForm) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | any
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>
   ) => {
     setFormData({
       ...formData,
