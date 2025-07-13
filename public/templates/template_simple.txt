@@ -1,0 +1,23 @@
+EVIDENCIA DE PRUEBA QA
+====================
+
+Información General:
+- Ciclo/Sprint: {{CICLO}}
+- Analista QA: {{ANALISTA}}
+- Caso de Prueba: {{CASOPRUEBA}}
+- Proyecto: {{PROYECTO}}
+- Fecha de Ejecución: {{FECHA}}
+- Estado: {{ESTADO}}
+
+RESULTADO DE LA PRUEBA:
+El caso de prueba {{CASOPRUEBA}} ejecutado por {{ANALISTA}} en el ciclo {{CICLO}} ha resultado en estado: {{ESTADO}}.
+
+Fecha de ejecución: {{FECHA}}
+Proyecto: {{PROYECTO}}
+
+EVIDENCIAS VISUALES:
+[Las imágenes serán insertadas aquí cuando implementemos esa funcionalidad]
+
+---
+Documento generado automáticamente por el Sistema de Evidencias QA
+Santander Consumer Bank

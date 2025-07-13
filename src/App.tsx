@@ -42,6 +42,11 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import { es } from 'date-fns/locale'
 import './App.css'
 
+// Librerías para generar documentos Word
+import Docxtemplater from 'docxtemplater'
+import PizZip from 'pizzip'
+import { saveAs } from 'file-saver'
+
 // Tema personalizado de Santander
 const santanderTheme = createTheme({
   palette: {
@@ -268,10 +273,121 @@ function App() {
     }
   }
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    console.log('Datos del formulario:', formData)
-    // Aquí implementaremos la generación del documento Word
+    
+    // Validar que todos los campos estén completos
+    if (!formData.cicloSprint || !formData.analistaQA || !formData.casoPrueba || 
+        !formData.proyectoEquipo || !formData.fechaEjecucion || !formData.estado) {
+      alert('Por favor, completa todos los campos del formulario')
+      return
+    }
+
+    try {
+      await generateWordDocument()
+      alert('¡Documento generado exitosamente!')
+    } catch (error) {
+      console.error('Error generando documento:', error)
+      alert('Error al generar el documento. Revisa la consola para más detalles.')
+    }
+  }
+
+  const generateWordDocument = async () => {
+    try {
+      console.log('Iniciando generación de documento Word...')
+      
+      // Obtener la base URL actual y construir la ruta correcta
+      const baseUrl = import.meta.env.BASE_URL || '/'
+      const templatePath = `${baseUrl}templates/Plantilla.docx`
+      console.log('Base URL:', baseUrl)
+      console.log('Cargando plantilla desde:', templatePath)
+      
+      const response = await fetch(templatePath)
+      
+      if (!response.ok) {
+        throw new Error(`No se pudo cargar la plantilla desde ${templatePath}. Status: ${response.status}`)
+      }
+
+      const templateBuffer = await response.arrayBuffer()
+      console.log('Plantilla cargada, tamaño:', templateBuffer.byteLength, 'bytes')
+      
+      // Crear el ZIP desde el buffer de la plantilla
+      const zip = new PizZip(templateBuffer)
+      
+      // Crear el documento Docxtemplater con configuración específica para dobles llaves
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        delimiters: {
+          start: '{{',
+          end: '}}'
+        },
+        errorLogging: false
+      })
+
+      // Formatear la fecha
+      const fechaFormateada = formData.fechaEjecucion 
+        ? formData.fechaEjecucion.toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })
+        : ''
+
+      // Datos para reemplazar en la plantilla
+      const templateData = {
+        CICLO: formData.cicloSprint,
+        ANALISTA: formData.analistaQA,
+        CASOPRUEBA: formData.casoPrueba,
+        PROYECTO: formData.proyectoEquipo,
+        FECHA: fechaFormateada,
+        ESTADO: formData.estado
+      }
+
+      console.log('Datos para reemplazar en la plantilla:', templateData)
+
+      // Renderizar el documento con los datos y manejo de errores mejorado
+      try {
+        doc.render(templateData)
+        console.log('✅ Documento renderizado exitosamente')
+      } catch (error: any) {
+        console.error('❌ Error al renderizar el documento:', error)
+        
+        if (error.name === 'TemplateError') {
+          console.error('Errores de plantilla:', error.properties)
+          
+          // Mostrar errores específicos
+          if (error.properties && error.properties.errors) {
+            const errorDetails = error.properties.errors.map((err: any) => 
+              `- Variable: ${err.name || 'desconocida'} | Problema: ${err.explanation || 'desconocido'}`
+            ).join('\n')
+            
+            throw new Error(`Error en la plantilla Word:\n${errorDetails}\n\n📝 IMPORTANTE: Verifica que tu plantilla Plantilla.docx contenga exactamente estas variables:\n{{CICLO}}\n{{ANALISTA}}\n{{CASOPRUEBA}}\n{{PROYECTO}}\n{{FECHA}}\n{{ESTADO}}\n\n⚠️ Asegúrate de usar dobles llaves {{ }} y que no haya espacios dentro de las llaves.`)
+          }
+        }
+        
+        throw new Error(`Error al procesar la plantilla Word: ${error.message}\n\n💡 Verifica que:\n1. El archivo Plantilla.docx sea válido\n2. Use dobles llaves: {{VARIABLE}}\n3. No tenga espacios dentro de las llaves\n4. Las variables estén escritas exactamente como: CICLO, ANALISTA, CASOPRUEBA, PROYECTO, FECHA, ESTADO`)
+      }
+
+      // Generar el documento final
+      const output = doc.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      })
+
+      // Crear nombre del archivo con timestamp
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-')
+      const fileName = `Evidencia_${formData.casoPrueba}_${timestamp}.docx`
+
+      // Descargar el archivo
+      saveAs(output, fileName)
+      
+      console.log('Documento generado exitosamente:', fileName)
+      
+    } catch (error) {
+      console.error('Error detallado:', error)
+      throw error
+    }
   }
 
   const resetForm = () => {
