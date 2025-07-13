@@ -1,0 +1,99 @@
+/* Reset y estilos globales para la aplicación de evidencias QA */
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  width: 100%;
+  background: #FFFFFF;
+  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+/* Animaciones para elementos interactivos */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(236, 0, 0, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(236, 0, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(236, 0, 0, 0);
+  }
+}
+
+/* Estilos para elementos con animación */
+.animate-fade-in {
+  animation: fadeIn 0.6s ease-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
+
+/* Estilos personalizados para el tema Santander */
+.santander-gradient {
+  background: linear-gradient(45deg, #EC0000 30%, #FF4444 90%);
+}
+
+.santander-shadow {
+  box-shadow: 0 4px 20px rgba(236, 0, 0, 0.15);
+}
+
+/* Estilos para campos de formulario mejorados */
+.form-field-enhanced {
+  transition: all 0.3s ease;
+}
+
+.form-field-enhanced:hover {
+  transform: translateY(-2px);
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+  #root {
+    padding: 1rem;
+  }
+}
+
+/* Utilidades adicionales */
+.text-santander {
+  color: #EC0000;
+}
+
+.bg-santander {
+  background-color: #EC0000;
+}
+
+.border-santander {
+  border-color: #EC0000;
+}
