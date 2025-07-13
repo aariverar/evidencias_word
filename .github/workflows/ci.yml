@@ -1,0 +1,40 @@
+# ⚡ GitHub Actions - Quick CI
+name: ⚡ Quick CI
+
+# Ejecutar en todos los push y pull requests
+on:
+  push:
+  pull_request:
+
+jobs:
+  # 🔍 Job de verificación rápida
+  quick-check:
+    name: 🔍 Quick Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🎯 Type check
+      run: npx tsc --noEmit
+      
+    - name: 🏗️ Build check
+      run: npm run build
+      
+    - name: ✅ Success notification
+      run: |
+        echo "🎉 ¡Verificación completada exitosamente!"
+        echo "📊 Archivos verificados:"
+        find src -name "*.tsx" -o -name "*.ts" | wc -l
+        echo "🔧 Dependencias instaladas:"
+        npm list --depth=0 | grep -c "├──\|└──"
