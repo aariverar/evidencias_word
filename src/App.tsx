@@ -292,6 +292,194 @@ function App() {
     }
   }
 
+  // Función que replica add_images_to_doc del utilities.py
+  const addImagesToDoc = async (doc: any, imageFiles: ImageFile[]) => {
+    try {
+      console.log('🖼️ Iniciando add_images_to_doc (replicando utilities.py)...')
+      
+      // Obtener el ZIP del documento para manipular el XML
+      const zip = doc.getZip()
+      
+      // Leer el document.xml actual
+      let documentXml = zip.file('word/document.xml').asText()
+      
+      // Asegurar que existe el directorio media
+      if (!zip.file('word/media/')) {
+        zip.folder('word/media')
+      }
+      
+      // Crear el XML para las imágenes (una por una, con título y imagen)
+      let imagesXml = ''
+      
+      for (let i = 0; i < imageFiles.length; i++) {
+        const image = imageFiles[i]
+        
+        try {
+          // 1. Obtener los datos de la imagen
+          const response = await fetch(image.preview)
+          const arrayBuffer = await response.arrayBuffer()
+          const imageData = new Uint8Array(arrayBuffer)
+          
+          console.log(`📷 Procesando imagen ${i + 1}: ${image.name}, tamaño: ${imageData.length} bytes`)
+          
+          // 1.5. Calcular dimensiones de la imagen para mostrarla completa
+          const img = new Image()
+          const imageUrl = URL.createObjectURL(new Blob([imageData]))
+          
+          await new Promise((resolve) => {
+            img.onload = resolve
+            img.src = imageUrl
+          })
+          
+          // Calcular tamaño para Word (manteniendo proporciones)
+          const maxWidthCm = 15.00 // Ancho máximo exacto para aprovechar el ancho del Word
+          const maxHeightCm = 12  // Alto máximo también aumentado
+          
+          const widthCm = Math.min(maxWidthCm, (img.width * maxWidthCm) / Math.max(img.width, img.height))
+          const heightCm = (widthCm * img.height) / img.width
+          
+          // Convertir a EMUs (English Metric Units) para Word
+          const widthEmu = Math.round(widthCm * 360000)  // 1cm = 360000 EMUs
+          const heightEmu = Math.round(heightCm * 360000)
+          
+          console.log(`📐 Imagen ${i + 1}: ${img.width}x${img.height}px -> ${widthCm.toFixed(1)}x${heightCm.toFixed(1)}cm (${widthEmu}x${heightEmu} EMUs)`)
+          
+          // Limpiar URL temporal
+          URL.revokeObjectURL(imageUrl)
+          
+          // 2. Determinar extensión
+          let extension = 'png'
+          if (image.file.type.includes('jpeg') || image.file.type.includes('jpg')) {
+            extension = 'jpeg'
+          }
+          
+          // 3. Generar nombre único para la imagen (con timestamp para garantizar unicidad)
+          const timestamp = Date.now()
+          const imageName = `custom_img_${timestamp}_${i + 1}.${extension}`
+          
+          // 4. Agregar la imagen al ZIP del documento
+          zip.file(`word/media/${imageName}`, imageData)
+          console.log(`💾 Imagen guardada como: word/media/${imageName}`)
+          
+          // 5. Crear XML para el título de la imagen (párrafo con el nombre)
+          const imageTitle = image.name.replace(/\.[^/.]+$/, '') // Remover extensión
+          
+          // 6. Agregar título e imagen usando XML básico y seguro
+          // NOTA: Usamos IDs muy altos y únicos para evitar cualquier conflicto
+          const baseId = 5000 + (i * 100) // 5000, 5100, 5200, etc. - números muy altos
+          const relationshipId = `rId${baseId}`
+          const docPrId = baseId + 50 // ID diferente para docPr (5050, 5150, etc.)
+          
+          console.log(`🔗 Usando IDs ultra-seguros: rel=${relationshipId}, docPr=${docPrId} -> media/${imageName} (100% separado de plantilla)`)
+          
+          imagesXml += `
+            <w:p>
+              <w:pPr>
+                <w:ind w:left="567"/>
+                <w:pStyle w:val="Heading3"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:b/>
+                </w:rPr>
+                <w:t>${imageTitle}</w:t>
+              </w:r>
+            </w:p>
+            <w:p>
+              <w:pPr>
+                <w:jc w:val="center"/>
+              </w:pPr>
+              <w:r>
+                <w:rPr>
+                  <w:noProof/>
+                </w:rPr>
+                <w:drawing>
+                  <wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+                    <wp:extent cx="${widthEmu}" cy="${heightEmu}"/>
+                    <wp:docPr id="${docPrId}" name="${imageName}"/>
+                    <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                      <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                        <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                          <pic:nvPicPr>
+                            <pic:cNvPr id="${docPrId}" name="${imageName}"/>
+                            <pic:cNvPicPr/>
+                          </pic:nvPicPr>
+                          <pic:blipFill>
+                            <a:blip r:embed="${relationshipId}"/>
+                            <a:stretch>
+                              <a:fillRect/>
+                            </a:stretch>
+                          </pic:blipFill>
+                          <pic:spPr>
+                            <a:xfrm>
+                              <a:off x="0" y="0"/>
+                              <a:ext cx="${widthEmu}" cy="${heightEmu}"/>
+                            </a:xfrm>
+                            <a:prstGeom prst="rect"/>
+                          </pic:spPr>
+                        </pic:pic>
+                      </a:graphicData>
+                    </a:graphic>
+                  </wp:inline>
+                </w:drawing>
+              </w:r>
+            </w:p>
+            <w:p/>
+          `
+          
+          // 7. Agregar la nueva relación con ID ultra-seguro
+          const relsXml = zip.file('word/_rels/document.xml.rels').asText()
+          
+          // Verificar que NO estamos sobrescribiendo ninguna relación existente
+          if (relsXml.includes(relationshipId)) {
+            console.error(`⚠️ CONFLICTO: ${relationshipId} ya existe en la plantilla!`)
+          }
+          
+          const newRelXml = relsXml.replace(
+            '</Relationships>',
+            `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${imageName}"/></Relationships>`
+          )
+          zip.file('word/_rels/document.xml.rels', newRelXml)
+          console.log(`✅ Relación ${relationshipId} agregada correctamente (ultra-segura para plantilla)`)
+          
+          // 8. Agregar tipo de contenido para la imagen
+          const contentTypesXml = zip.file('[Content_Types].xml').asText()
+          const imageExtension = extension === 'jpeg' ? 'jpeg' : 'png'
+          const contentType = extension === 'jpeg' ? 'image/jpeg' : 'image/png'
+          
+          if (!contentTypesXml.includes(`Extension="${imageExtension}"`)) {
+            const newContentTypesXml = contentTypesXml.replace(
+              '</Types>',
+              `<Default Extension="${imageExtension}" ContentType="${contentType}"/></Types>`
+            )
+            zip.file('[Content_Types].xml', newContentTypesXml)
+            console.log(`📄 Tipo de contenido agregado para .${imageExtension}`)
+          }
+          
+          console.log(`✅ Imagen ${i + 1} (${image.name}) procesada para el documento`)
+          
+        } catch (error) {
+          console.error(`❌ Error al procesar imagen ${i + 1}:`, error)
+        }
+      }
+      
+      // 8. Agregar las imágenes al final del documento (antes de </w:body>)
+      if (imagesXml) {
+        const updatedDocumentXml = documentXml.replace(
+          '</w:body>',
+          `${imagesXml}</w:body>`
+        )
+        zip.file('word/document.xml', updatedDocumentXml)
+        
+        console.log(`✅ ${imageFiles.length} imágenes agregadas al documento`)
+      }
+      
+    } catch (error) {
+      console.error('💥 Error en add_images_to_doc:', error)
+      throw error
+    }
+  }
+
   const generateWordDocument = async () => {
     try {
       console.log('Iniciando generación de documento Word...')
@@ -334,8 +522,8 @@ function App() {
           })
         : ''
 
-      // Datos para reemplazar en la plantilla
-      const templateData = {
+      // Crear el contexto con todos los datos del formulario (solo datos básicos)
+      const templateData: any = {
         CICLO: formData.cicloSprint,
         ANALISTA: formData.analistaQA,
         CASOPRUEBA: formData.casoPrueba,
@@ -344,7 +532,7 @@ function App() {
         ESTADO: formData.estado
       }
 
-      console.log('Datos para reemplazar en la plantilla:', templateData)
+      console.log('📋 Datos para reemplazar en la plantilla:', templateData)
 
       // Renderizar el documento con los datos y manejo de errores mejorado
       try {
@@ -367,6 +555,12 @@ function App() {
         }
         
         throw new Error(`Error al procesar la plantilla Word: ${error.message}\n\n💡 Verifica que:\n1. El archivo Plantilla.docx sea válido\n2. Use dobles llaves: {{VARIABLE}}\n3. No tenga espacios dentro de las llaves\n4. Las variables estén escritas exactamente como: CICLO, ANALISTA, CASOPRUEBA, PROYECTO, FECHA, ESTADO`)
+      }
+
+      // AQUÍ AGREGAMOS LAS IMÁGENES COMO EN utilities.py (add_images_to_doc)
+      if (images.length > 0) {
+        console.log('🖼️ Agregando imágenes al documento (replicando add_images_to_doc)...')
+        await addImagesToDoc(doc, images)
       }
 
       // Generar el documento final
