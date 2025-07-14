@@ -604,11 +604,11 @@ function App() {
           <AppBar position="static" elevation={0}>
             <Toolbar sx={{ justifyContent: 'center', position: 'relative' }}>
               <Typography variant="h6" component="div" sx={{ fontWeight: 600, color: '#FFFFFF' }}>
-                Generador de Evidencias QA
+                Santander - Generador de Evidencias
               </Typography>
               <Box sx={{ position: 'absolute', right: 16, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Box sx={{ width: 40, height: 40, backgroundColor: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Typography sx={{ color: '#EC0000', fontWeight: 'bold', fontSize: '18px' }}>S</Typography>
+                  <Typography sx={{ color: '#EC0000', fontWeight: 'bold', fontSize: '18px' }}>QA</Typography>
                 </Box>
               </Box>
             </Toolbar>
@@ -616,9 +616,6 @@ function App() {
 
           <Container maxWidth="lg" sx={{ py: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
             <Paper elevation={0} sx={{ p: 4, mb: 3, width: '100%', maxWidth: '100%' }}>
-              <Typography variant="h4" gutterBottom align="center" sx={{ mb: 3 }}>
-                Generación de Evidencias de Pruebas
-              </Typography>
               <Typography variant="body1" align="center" color="text.secondary" sx={{ mb: 4 }}>
                 Completa los datos para generar tu documento de evidencias en formato Word
               </Typography>
@@ -710,9 +707,7 @@ function App() {
 
                 {/* Sección de carga de imágenes */}
                 <Box sx={{ mt: 4, width: '100%', maxWidth: 800, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <Typography variant="h6" gutterBottom align="center" sx={{ color: '#EC0000', fontWeight: 600 }}>
-                    Evidencias Visuales
-                  </Typography>
+
                   
                   {/* Área de drag & drop */}
                   <Box
@@ -872,10 +867,10 @@ function App() {
               backgroundColor: '#FAFAFA'
             }}>
               <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                © Santander Consumer Bank - Equipo Calidad
+                © Santander Consumer Bank - Aseguramiento de Calidad
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                Sistema de Generación de Evidencias QA - {new Date().getFullYear()}
+                Powered by Abraham Rivera | Support: arivera_scb@santander.com.pe - {new Date().getFullYear()}
               </Typography>
             </Box>
 
