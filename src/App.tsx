@@ -333,7 +333,6 @@ function App() {
           
           // Calcular tamaño para Word (manteniendo proporciones)
           const maxWidthCm = 15.00 // Ancho máximo exacto para aprovechar el ancho del Word
-          const maxHeightCm = 12  // Alto máximo también aumentado
           
           const widthCm = Math.min(maxWidthCm, (img.width * maxWidthCm) / Math.max(img.width, img.height))
           const heightCm = (widthCm * img.height) / img.width
