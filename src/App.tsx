@@ -293,7 +293,7 @@ function App() {
   }
 
   // Función que replica add_images_to_doc del utilities.py
-  const addImagesToDoc = async (doc: any, imageFiles: ImageFile[]) => {
+  const addImagesToDoc = async (doc: Docxtemplater, imageFiles: ImageFile[]) => {
     try {
       console.log('🖼️ Iniciando add_images_to_doc (replicando utilities.py)...')
       
@@ -301,7 +301,7 @@ function App() {
       const zip = doc.getZip()
       
       // Leer el document.xml actual
-      let documentXml = zip.file('word/document.xml').asText()
+      const documentXml = zip.file('word/document.xml').asText()
       
       // Asegurar que existe el directorio media
       if (!zip.file('word/media/')) {
@@ -522,7 +522,7 @@ function App() {
         : ''
 
       // Crear el contexto con todos los datos del formulario (solo datos básicos)
-      const templateData: any = {
+      const templateData: Record<string, string> = {
         CICLO: formData.cicloSprint,
         ANALISTA: formData.analistaQA,
         CASOPRUEBA: formData.casoPrueba,
@@ -537,23 +537,19 @@ function App() {
       try {
         doc.render(templateData)
         console.log('✅ Documento renderizado exitosamente')
-      } catch (error: any) {
-        console.error('❌ Error al renderizar el documento:', error)
-        
-        if (error.name === 'TemplateError') {
-          console.error('Errores de plantilla:', error.properties)
-          
-          // Mostrar errores específicos
-          if (error.properties && error.properties.errors) {
-            const errorDetails = error.properties.errors.map((err: any) => 
+      } catch (error) {
+        console.error('❌ Error al renderizar el documento:', error);
+        if (error && typeof error === 'object' && 'name' in error && (error as any).name === 'TemplateError') {
+          const templateError = error as { name: string; properties?: { errors?: { name?: string; explanation?: string }[] } };
+          console.error('Errores de plantilla:', templateError.properties);
+          if (templateError.properties && templateError.properties.errors) {
+            const errorDetails = templateError.properties.errors.map((err) => 
               `- Variable: ${err.name || 'desconocida'} | Problema: ${err.explanation || 'desconocido'}`
-            ).join('\n')
-            
-            throw new Error(`Error en la plantilla Word:\n${errorDetails}\n\n📝 IMPORTANTE: Verifica que tu plantilla Plantilla.docx contenga exactamente estas variables:\n{{CICLO}}\n{{ANALISTA}}\n{{CASOPRUEBA}}\n{{PROYECTO}}\n{{FECHA}}\n{{ESTADO}}\n\n⚠️ Asegúrate de usar dobles llaves {{ }} y que no haya espacios dentro de las llaves.`)
+            ).join('\n');
+            throw new Error(`Error en la plantilla Word:\n${errorDetails}\n\n📝 IMPORTANTE: Verifica que tu plantilla Plantilla.docx contenga exactamente estas variables:\n{{CICLO}}\n{{ANALISTA}}\n{{CASOPRUEBA}}\n{{PROYECTO}}\n{{FECHA}}\n{{ESTADO}}\n\n⚠️ Asegúrate de usar dobles llaves {{ }} y que no haya espacios dentro de las llaves.`);
           }
         }
-        
-        throw new Error(`Error al procesar la plantilla Word: ${error.message}\n\n💡 Verifica que:\n1. El archivo Plantilla.docx sea válido\n2. Use dobles llaves: {{VARIABLE}}\n3. No tenga espacios dentro de las llaves\n4. Las variables estén escritas exactamente como: CICLO, ANALISTA, CASOPRUEBA, PROYECTO, FECHA, ESTADO`)
+        throw new Error(`Error al procesar la plantilla Word: ${(error as Error).message}\n\n💡 Verifica que:\n1. El archivo Plantilla.docx sea válido\n2. Use dobles llaves: {{VARIABLE}}\n3. No tenga espacios dentro de las llaves\n4. Las variables estén escritas exactamente como: CICLO, ANALISTA, CASOPRUEBA, PROYECTO, FECHA, ESTADO`);
       }
 
       // AQUÍ AGREGAMOS LAS IMÁGENES COMO EN utilities.py (add_images_to_doc)
