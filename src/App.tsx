@@ -150,7 +150,6 @@ function App() {
   const [newImageName, setNewImageName] = useState('')
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
-  const [isProcessingImages, setIsProcessingImages] = useState(false)
 
   const handleInputChange = (field: keyof EvidenceForm) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>
@@ -168,100 +167,22 @@ function App() {
     })
   }
 
-  // Función para redimensionar imágenes y optimizar carga
-  const resizeImage = useCallback((file: File, maxWidth: number = 800, maxHeight: number = 600, quality: number = 0.8): Promise<File> => {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      const img = new Image()
-      
-      img.onload = () => {
-        // Calcular nuevas dimensiones manteniendo la proporción
-        let { width, height } = img
-        
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height)
-          width *= ratio
-          height *= ratio
-          console.log(`📏 Redimensionando de ${img.width}x${img.height} a ${Math.round(width)}x${Math.round(height)}`)
-        }
-        
-        canvas.width = width
-        canvas.height = height
-        
-        // Dibujar imagen redimensionada
-        ctx?.drawImage(img, 0, 0, width, height)
-        
-        // Convertir a blob optimizado
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const optimizedFile = new File([blob], file.name, {
-              type: file.type,
-              lastModified: Date.now()
-            })
-            const compressionRatio = ((file.size - blob.size) / file.size * 100).toFixed(1)
-            console.log(`🗜️ Compresión: ${(file.size / 1024).toFixed(1)}KB → ${(blob.size / 1024).toFixed(1)}KB (${compressionRatio}% menos)`)
-            resolve(optimizedFile)
-          } else {
-            resolve(file) // Fallback al archivo original
-          }
-        }, file.type, quality)
-      }
-      
-      img.src = URL.createObjectURL(file)
-    })
-  }, [])
-
   // Funciones para manejo de imágenes
-  const handleFileSelect = useCallback(async (files: FileList | File[]) => {
+  const handleFileSelect = useCallback((files: FileList | File[]) => {
     const fileArray = Array.from(files)
     const validFiles = fileArray.filter(file => file.type.startsWith('image/'))
     
-    if (validFiles.length === 0) return
-    
-    setIsProcessingImages(true)
-    console.log(`🖼️ Procesando ${validFiles.length} imágenes...`)
-    
-    const newImages: ImageFile[] = []
-    
-    for (let i = 0; i < validFiles.length; i++) {
-      const file = validFiles[i]
-      console.log(`⏳ Optimizando imagen ${i + 1}/${validFiles.length}: ${file.name}`)
-      
-      try {
-        // Redimensionar imagen para optimizar carga
-        const optimizedFile = await resizeImage(file)
-        
-        const imageFile: ImageFile = {
-          id: `img_${Date.now()}_${i}`,
-          file: optimizedFile,
-          name: file.name.split('.')[0],
-          preview: URL.createObjectURL(optimizedFile),
-          originalName: file.name,
-          order: images.length + i
-        }
-        
-        newImages.push(imageFile)
-        console.log(`✅ Imagen optimizada: ${file.name}`)
-      } catch (error) {
-        console.error(`❌ Error optimizando imagen ${file.name}:`, error)
-        // Fallback al archivo original
-        const imageFile: ImageFile = {
-          id: `img_${Date.now()}_${i}`,
-          file,
-          name: file.name.split('.')[0],
-          preview: URL.createObjectURL(file),
-          originalName: file.name,
-          order: images.length + i
-        }
-        newImages.push(imageFile)
-      }
-    }
+    const newImages: ImageFile[] = validFiles.map((file, index) => ({
+      id: `img_${Date.now()}_${index}`,
+      file,
+      name: file.name.split('.')[0],
+      preview: URL.createObjectURL(file),
+      originalName: file.name,
+      order: images.length + index
+    }))
 
     setImages(prev => [...prev, ...newImages])
-    setIsProcessingImages(false)
-    console.log(`🎉 ${newImages.length} imágenes procesadas y agregadas`)
-  }, [images.length, resizeImage])
+  }, [images.length])
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -372,7 +293,7 @@ function App() {
   }
 
   // Función que replica add_images_to_doc del utilities.py
-  const addImagesToDoc = async (doc: Docxtemplater, imageFiles: ImageFile[]) => {
+  const addImagesToDoc = async (doc: any, imageFiles: ImageFile[]) => {
     try {
       console.log('🖼️ Iniciando add_images_to_doc (replicando utilities.py)...')
       
@@ -380,7 +301,7 @@ function App() {
       const zip = doc.getZip()
       
       // Leer el document.xml actual
-      const documentXml = zip.file('word/document.xml')?.asText() || ''
+      let documentXml = zip.file('word/document.xml').asText()
       
       // Asegurar que existe el directorio media
       if (!zip.file('word/media/')) {
@@ -439,17 +360,15 @@ function App() {
           zip.file(`word/media/${imageName}`, imageData)
           console.log(`💾 Imagen guardada como: word/media/${imageName}`)
           
-          // 5. Crear XML para el título de la imagen (párrafo con el nombre)
-          const imageTitle = image.name.replace(/\.[^/.]+$/, '') // Remover extensión
-          
+          // 5. Crear el título numerado para la imagen
+          const getNumberedTitle = (title: string, index: number) => `${index + 1}. ${title}`
+          const imageTitle = getNumberedTitle(image.name.replace(/\.[^/.]+$/, ''), i)
           // 6. Agregar título e imagen usando XML básico y seguro
           // NOTA: Usamos IDs muy altos y únicos para evitar cualquier conflicto
           const baseId = 5000 + (i * 100) // 5000, 5100, 5200, etc. - números muy altos
           const relationshipId = `rId${baseId}`
           const docPrId = baseId + 50 // ID diferente para docPr (5050, 5150, etc.)
-          
           console.log(`🔗 Usando IDs ultra-seguros: rel=${relationshipId}, docPr=${docPrId} -> media/${imageName} (100% separado de plantilla)`)
-          
           imagesXml += `
             <w:p>
               <w:pPr>
@@ -458,10 +377,12 @@ function App() {
               </w:pPr>
               <w:r>
                 <w:rPr>
-                  <w:b/>
+                  <w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/>
+                  <w:sz w:val="22"/>
                 </w:rPr>
                 <w:t>${imageTitle}</w:t>
               </w:r>
+              <w:r><w:br/></w:r>
             </w:p>
             <w:p>
               <w:pPr>
@@ -601,7 +522,7 @@ function App() {
         : ''
 
       // Crear el contexto con todos los datos del formulario (solo datos básicos)
-      const templateData = {
+      const templateData: any = {
         CICLO: formData.cicloSprint,
         ANALISTA: formData.analistaQA,
         CASOPRUEBA: formData.casoPrueba,
@@ -616,17 +537,15 @@ function App() {
       try {
         doc.render(templateData)
         console.log('✅ Documento renderizado exitosamente')
-      } catch (error: unknown) {
+      } catch (error: any) {
         console.error('❌ Error al renderizar el documento:', error)
         
-        const errorObj = error as { name?: string; properties?: { errors?: Array<{ name?: string; explanation?: string }> } }
-        
-        if (errorObj.name === 'TemplateError') {
-          console.error('Errores de plantilla:', errorObj.properties)
+        if (error.name === 'TemplateError') {
+          console.error('Errores de plantilla:', error.properties)
           
           // Mostrar errores específicos
-          if (errorObj.properties && errorObj.properties.errors) {
-            const errorDetails = errorObj.properties.errors.map((err) => 
+          if (error.properties && error.properties.errors) {
+            const errorDetails = error.properties.errors.map((err: any) => 
               `- Variable: ${err.name || 'desconocida'} | Problema: ${err.explanation || 'desconocido'}`
             ).join('\n')
             
@@ -634,8 +553,7 @@ function App() {
           }
         }
         
-        const errorMessage = errorObj instanceof Error ? errorObj.message : 'Error desconocido'
-        throw new Error(`Error al procesar la plantilla Word: ${errorMessage}\n\n💡 Verifica que:\n1. El archivo Plantilla.docx sea válido\n2. Use dobles llaves: {{VARIABLE}}\n3. No tenga espacios dentro de las llaves\n4. Las variables estén escritas exactamente como: CICLO, ANALISTA, CASOPRUEBA, PROYECTO, FECHA, ESTADO`)
+        throw new Error(`Error al procesar la plantilla Word: ${error.message}\n\n💡 Verifica que:\n1. El archivo Plantilla.docx sea válido\n2. Use dobles llaves: {{VARIABLE}}\n3. No tenga espacios dentro de las llaves\n4. Las variables estén escritas exactamente como: CICLO, ANALISTA, CASOPRUEBA, PROYECTO, FECHA, ESTADO`)
       }
 
       // AQUÍ AGREGAMOS LAS IMÁGENES COMO EN utilities.py (add_images_to_doc)
@@ -793,24 +711,24 @@ function App() {
                   
                   {/* Área de drag & drop */}
                   <Box
-                    onDragOver={isProcessingImages ? undefined : handleDragOver}
-                    onDragLeave={isProcessingImages ? undefined : handleDragLeave}
-                    onDrop={isProcessingImages ? undefined : handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
                     sx={{
-                      border: `2px dashed ${isDragOver && !isProcessingImages ? '#EC0000' : '#CCCCCC'}`,
+                      border: `2px dashed ${isDragOver ? '#EC0000' : '#CCCCCC'}`,
                       borderRadius: 2,
                       p: 3,
                       textAlign: 'center',
-                      backgroundColor: isProcessingImages ? '#F5F5F5' : (isDragOver ? 'rgba(236, 0, 0, 0.04)' : '#F8F9FA'),
-                      cursor: isProcessingImages ? 'not-allowed' : 'pointer',
+                      backgroundColor: isDragOver ? 'rgba(236, 0, 0, 0.05)' : '#F8F9FA',
                       transition: 'all 0.3s ease',
+                      cursor: 'pointer',
                       width: '100%',
                       '&:hover': {
-                        borderColor: isProcessingImages ? '#CCCCCC' : '#EC0000',
-                        backgroundColor: isProcessingImages ? '#F5F5F5' : 'rgba(236, 0, 0, 0.02)'
+                        borderColor: '#EC0000',
+                        backgroundColor: 'rgba(236, 0, 0, 0.02)'
                       }
                     }}
-                    onClick={isProcessingImages ? undefined : () => fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     <input
                       ref={fileInputRef}
@@ -820,45 +738,17 @@ function App() {
                       onChange={handleFileInputChange}
                       style={{ display: 'none' }}
                     />
-                    <CloudUpload sx={{ fontSize: 48, color: isProcessingImages ? '#999' : '#EC0000', mb: 2 }} />
+                    <CloudUpload sx={{ fontSize: 48, color: '#EC0000', mb: 2 }} />
                     <Typography variant="h6" gutterBottom>
-                      {isProcessingImages ? 'Procesando imágenes...' : 'Arrastra tus imágenes aquí'}
+                      Arrastra tus imágenes aquí
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      {isProcessingImages ? 'Por favor espera...' : 'o haz clic para seleccionar archivos'}
+                      o haz clic para seleccionar archivos
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       Formatos soportados: JPG, PNG, GIF, WebP
                     </Typography>
                   </Box>
-
-                  {/* Indicador de carga de imágenes */}
-                  {isProcessingImages && (
-                    <Box sx={{ mt: 3, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <Typography variant="body2" color="primary" sx={{ mb: 2, fontWeight: 500 }}>
-                        🔄 Optimizando imágenes...
-                      </Typography>
-                      <Box sx={{ 
-                        width: '100%', 
-                        maxWidth: 400, 
-                        height: 4, 
-                        backgroundColor: '#E0E0E0', 
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        mb: 2
-                      }}>
-                        <Box sx={{ 
-                          height: '100%', 
-                          backgroundColor: '#EC0000',
-                          animation: 'progress 2s linear infinite',
-                          '@keyframes progress': {
-                            '0%': { transform: 'translateX(-100%)' },
-                            '100%': { transform: 'translateX(100%)' }
-                          }
-                        }} />
-                      </Box>
-                    </Box>
-                  )}
 
                   {/* Mostrar imágenes cargadas */}
                   {images.length > 0 && (
@@ -899,19 +789,10 @@ function App() {
                               <img
                                 src={image.preview}
                                 alt={image.name}
-                                loading="lazy"
                                 style={{
                                   width: '100%',
                                   height: '100%',
                                   objectFit: 'cover'
-                                }}
-                                onError={(e) => {
-                                  console.error('Error cargando imagen:', image.name)
-                                  const target = e.target as HTMLImageElement
-                                  target.style.display = 'none'
-                                }}
-                                onLoad={() => {
-                                  console.log('✅ Imagen cargada:', image.name)
                                 }}
                               />
                             </Box>
@@ -1075,21 +956,12 @@ function App() {
                               <img
                                 src={image.preview}
                                 alt={image.name}
-                                loading="lazy"
                                 style={{
                                   width: 80,
                                   height: 80,
                                   objectFit: 'cover',
                                   borderRadius: 8,
                                   border: '1px solid #E0E0E0'
-                                }}
-                                onError={(e) => {
-                                  console.error('Error cargando imagen en modal:', image.name)
-                                  const target = e.target as HTMLImageElement
-                                  target.style.display = 'none'
-                                }}
-                                onLoad={() => {
-                                  console.log('✅ Imagen cargada en modal:', image.name)
                                 }}
                               />
                               <Chip
